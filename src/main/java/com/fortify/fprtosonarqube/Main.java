@@ -33,6 +33,8 @@ import java.util.Map;
 
 import javax.xml.stream.XMLStreamException;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -122,17 +124,21 @@ public class Main {
 	}
 
 	private Location getPrimaryLocation(Vulnerability vuln, SourceLocation sourceLocation) {
+		String msg = vuln.getClassInfo().getType();
+		if ( StringUtils.isNotBlank(vuln.getClassInfo().getSubtype()) ) {
+			msg += ": "+vuln.getClassInfo().getSubtype();
+		}
 		return Location.builder()
 			.filePath(Paths.get(sourceBasePath, sourceLocation.getPath()).toFile().getAbsolutePath())
-			.message("TODO-generate message from abstract")
-			// TODO .textRange(getTextRange(sourceLocation))
+			.message(msg) // TODO Add/use abstract?
+			.textRange(getTextRange(sourceLocation))
 			.build();
 	}
 
 	private TextRange getTextRange(SourceLocation sourceLocation) {
 		System.out.println(sourceLocation);
 		TextRangeBuilder textRangeBuilder = TextRange.builder()
-			.startLine(sourceLocation.getLine()+1)
+			.startLine(sourceLocation.getLine())
 			.startColumn(sourceLocation.getColStart());
 		if ( sourceLocation.getLineEnd()!=null && sourceLocation.getLineEnd()>sourceLocation.getLine()) {
 			textRangeBuilder.endLine(sourceLocation.getLineEnd());
