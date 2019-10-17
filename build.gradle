@@ -53,6 +53,9 @@ dependencies {
 
 jar {
     // include files from compileExport dependencies
+    manifest {
+        attributes 'Main-Class': 'com.fortify.fprtosonarqube.Main'
+    }
     from { configurations.compileExport.collect { it.isDirectory() ? it : zipTree(it).matching { exclude('META-INF/*', '/*.txt', '/*.html') } } }
 }
 
