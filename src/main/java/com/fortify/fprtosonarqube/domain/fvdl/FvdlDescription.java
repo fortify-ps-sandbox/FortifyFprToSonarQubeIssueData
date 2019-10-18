@@ -35,7 +35,7 @@ import lombok.ToString;
 
 @Getter @ToString @EqualsAndHashCode 
 //@JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
-public class Description implements Serializable {
+public class FvdlDescription implements Serializable {
 	private static final long serialVersionUID = 1L;
 	@JacksonXmlProperty(isAttribute=true) private String classID;
 	@JsonProperty("Explanation") private String explanation;

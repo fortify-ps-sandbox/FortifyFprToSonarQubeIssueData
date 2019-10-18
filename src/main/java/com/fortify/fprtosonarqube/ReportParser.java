@@ -22,36 +22,38 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
  * IN THE SOFTWARE.
  ******************************************************************************/
-package com.fortify.fprtosonarqube.util;
+package com.fortify.fprtosonarqube;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.util.Map;
 
 import javax.xml.stream.XMLStreamException;
 
-import com.fortify.util.xml.AbstractStreamingXmlParser;
+import org.mapdb.DB;
+import org.mapdb.Serializer;
 
-/**
- * Concrete implementation for {@link AbstractStreamingXmlParser}; this adds
- * the {@link #parse(String)} method for parsing audit.fvdl from an FPR file
- *  
- * @author Ruud Senden
- *
- */
-public class StreamingFvdlParser extends AbstractStreamingXmlParser<StreamingFvdlParser> {
-	public final void parseFpr(String fprFileName) throws IOException, XMLStreamException {
-		try (ZipFile zipFile = new ZipFile(fprFileName)) {
-			parse(zipFile);
-		}
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fortify.fprtosonarqube.domain.report.ReportIssue;
+import com.fortify.util.xml.StreamingXmlParser;
+import com.fortify.util.xml.XmlMapperHelper;
+
+public class ReportParser {
+	private final String reportFileName;
+	private final Map<String,String> iidToFolderMap;
+	
+	public ReportParser(String reportFileName, DB db) {
+		this.reportFileName = reportFileName;
+		iidToFolderMap = db.hashMap("rules", Serializer.STRING_ASCII, Serializer.STRING_ASCII).create();
 	}
 
-	private void parse(ZipFile fprFile) throws IOException, XMLStreamException {
-		ZipEntry zipEntry = fprFile.getEntry("audit.fvdl");
-		
-		try (InputStream inputStream = fprFile.getInputStream(zipEntry);) {
-			parse(inputStream);
-		}
+	public Map<String,String> parse(final JsonGenerator generator) throws IOException, XMLStreamException {
+		new StreamingXmlParser()
+			.handler("ReportSection/SubSection/IssueListing/Chart/GroupingSection/Issue", reader->{
+				ReportIssue issue = XmlMapperHelper.getDefaultXmlMapper().readValue(reader, ReportIssue.class);
+				System.out.println(issue);
+				iidToFolderMap.put(issue.getIid(), issue.getFolder());
+			})
+			.parse(reportFileName);
+		return iidToFolderMap;
 	}
 }

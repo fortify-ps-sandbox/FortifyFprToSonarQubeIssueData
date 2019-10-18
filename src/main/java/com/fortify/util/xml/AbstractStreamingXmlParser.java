@@ -24,6 +24,7 @@
  ******************************************************************************/
 package com.fortify.util.xml;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedHashMap;
@@ -54,6 +55,12 @@ public abstract class AbstractStreamingXmlParser<T extends AbstractStreamingXmlP
 	public final T handler(String path, XmlHandler handler) {
 		pathToHandlerMap.put(path, handler);
 		return _this;
+	}
+	
+	public final void parse(String fileName) throws IOException, XMLStreamException {
+		try ( InputStream inputStream = new FileInputStream(fileName) ) {
+			parse(inputStream);
+		}
 	}
 
 	public final void parse(InputStream inputStream) throws IOException, XMLStreamException {

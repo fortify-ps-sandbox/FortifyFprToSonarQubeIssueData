@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ReportDefinition type="xml">
+    <TemplateName>Issues</TemplateName>
+    <TemplatePath>.</TemplatePath>
+    <LogoPath>/MF_logo.jpg</LogoPath>
+    <Footnote>Copyright 2019 Micro Focus or one of its affiliates.</Footnote>
+    <UserName>nobody</UserName>
+    <ReportSection enabled="true" optionalSubsections="true">
+        <Title>Results Outline</Title>
+        <SubSection enabled="true">
+            <Title>Vulnerability Examples by Category</Title>
+            <Description>Results summary of all issue categories.  Vulnerability examples are provided by category.</Description>
+            <IssueListing listing="true" limit="-1">
+                <Refinement></Refinement>
+                <Chart chartType="list">
+                    <Axis>Category</Axis>
+                    <MajorAttribute>Analysis</MajorAttribute>
+                </Chart>
+            </IssueListing>
+        </SubSection>
+    </ReportSection>
+</ReportDefinition>

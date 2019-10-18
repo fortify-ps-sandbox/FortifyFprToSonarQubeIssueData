@@ -24,8 +24,6 @@
  ******************************************************************************/
 package com.fortify.fprtosonarqube;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
@@ -35,95 +33,101 @@ import javax.xml.stream.XMLStreamException;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.fasterxml.jackson.core.JsonEncoding;
-import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fortify.fprtosonarqube.domain.fvdl.Description;
-import com.fortify.fprtosonarqube.domain.fvdl.Vulnerability;
-import com.fortify.fprtosonarqube.domain.fvdl.Vulnerability.Entry;
-import com.fortify.fprtosonarqube.domain.fvdl.Vulnerability.Node;
-import com.fortify.fprtosonarqube.domain.fvdl.Vulnerability.SourceLocation;
-import com.fortify.fprtosonarqube.domain.sonarqube.Issue;
-import com.fortify.fprtosonarqube.domain.sonarqube.Issue.Location;
-import com.fortify.fprtosonarqube.domain.sonarqube.Issue.TextRange;
-import com.fortify.fprtosonarqube.domain.sonarqube.Issue.TextRange.TextRangeBuilder;
-import com.fortify.fprtosonarqube.domain.sonarqube.Rule;
+import com.fortify.fprtosonarqube.domain.fvdl.FvdlDescription;
+import com.fortify.fprtosonarqube.domain.fvdl.FvdlVulnerability;
+import com.fortify.fprtosonarqube.domain.fvdl.FvdlVulnerability.Entry;
+import com.fortify.fprtosonarqube.domain.fvdl.FvdlVulnerability.Node;
+import com.fortify.fprtosonarqube.domain.fvdl.FvdlVulnerability.SourceLocation;
+import com.fortify.fprtosonarqube.domain.sonarqube.SQIssue;
+import com.fortify.fprtosonarqube.domain.sonarqube.SQIssue.Location;
+import com.fortify.fprtosonarqube.domain.sonarqube.SQIssue.TextRange;
+import com.fortify.fprtosonarqube.domain.sonarqube.SQIssue.TextRange.TextRangeBuilder;
+import com.fortify.fprtosonarqube.domain.sonarqube.SQRule;
 import com.fortify.fprtosonarqube.util.StreamingFvdlParser;
 import com.fortify.util.xml.XmlMapperHelper;
 
-public class Main {
+public class FvdlParser {
 	private final String fprFileName;
-	private final String outputFileName;
+	private final Map<String, String> iidToFolderMap;
 	private Map<String, Node> nodePool = null;
 	private String sourceBasePath = null;
 	
-	public Main(String fprFileName, String outputFileName) {
+	public FvdlParser(String fprFileName, Map<String, String> iidToFolderMap) {
 		this.fprFileName = fprFileName;
-		this.outputFileName = outputFileName;
+		this.iidToFolderMap = iidToFolderMap;
 	}
 
 	private Map<String, Node> getNodePool() throws IOException, XMLStreamException {
 		if ( nodePool == null ) {
-			nodePool = new LinkedHashMap<String, Vulnerability.Node>();
+			nodePool = new LinkedHashMap<String, FvdlVulnerability.Node>();
 			new StreamingFvdlParser()
 					.handler("UnifiedNodePool/Node", reader-> {
 						Node node = XmlMapperHelper.getDefaultXmlMapper().readValue(reader, Node.class);
 						nodePool.put(node.getId(), node);
-					}).parse(fprFileName);
+					}).parseFpr(fprFileName);
 		}
 		return nodePool;
 	}
-	
-	private void process() throws FileNotFoundException, IOException, XMLStreamException {
-		try (JsonGenerator generator = new JsonFactory().createGenerator(
-                        new File(outputFileName)
-                        , JsonEncoding.UTF8)) {
-			generator.setCodec(new ObjectMapper());
-			generator.setPrettyPrinter(new DefaultPrettyPrinter());
-			generator.writeStartObject();
-			writeIssues(generator);
-			writeRules(generator);
-			generator.writeEndObject();
-		}
+
+	public void parse(final JsonGenerator generator) throws IOException, XMLStreamException {
+		writeIssues(generator);
+		writeRules(generator);
 	}
 
 	private void writeIssues(final JsonGenerator generator) throws IOException, XMLStreamException {
 		generator.writeArrayFieldStart("issues");
-		new StreamingFvdlParser()
-			.handler("Build/SourceBasePath", reader->sourceBasePath=reader.getElementText())
-			.handler("Vulnerabilities/Vulnerability", reader->{
-				Vulnerability vuln = XmlMapperHelper.getDefaultXmlMapper().readValue(reader, Vulnerability.class);
-				Issue issue = getIssue(vuln);
-				if ( issue!=null ) {
-					generator.writeObject(issue);
-				}
-			})
-			.parse(fprFileName);
+		if ( !iidToFolderMap.isEmpty() ) {
+			new StreamingFvdlParser()
+				.handler("Build/SourceBasePath", reader->sourceBasePath=reader.getElementText())
+				.handler("Vulnerabilities/Vulnerability", reader->{
+					FvdlVulnerability vuln = XmlMapperHelper.getDefaultXmlMapper().readValue(reader, FvdlVulnerability.class);
+					SQIssue issue = getSQIssue(vuln);
+					if ( issue!=null ) {
+						generator.writeObject(issue);
+					}
+				})
+				.parseFpr(fprFileName);
+		}
 		generator.writeEndArray();
 	}
 	
-	private Issue getIssue(Vulnerability vuln) throws IOException, XMLStreamException {
-		Issue issue = null;
+	private SQIssue getSQIssue(FvdlVulnerability vuln) throws IOException, XMLStreamException {
+		SQIssue issue = null;
 		// TODO Add null checks
-		Entry entry = vuln.getAnalysisInfo().getUnified().getTrace().getPrimary().getDefaultEntry();
-		Node node = entry.getNode();
-		if ( node==null && entry.getNodeRef()!=null) {
-			node = getNodePool().get(entry.getNodeRef().getId());
-		}
-		if ( node!= null && node.getSourceLocation()!=null ) {
-			issue = Issue.builder()
-				.engineId("Fortify")
-				.ruleId(vuln.getClassInfo().getClassID())
-				.type("VULNERABILITY")
-				.severity("BLOCKER") //TODO Map from Fortify
-				.primaryLocation(getPrimaryLocation(vuln, node.getSourceLocation())).build();
+		String iid = vuln.getInstanceInfo().getInstanceID();
+		String folder = iidToFolderMap.get(iid);
+		if ( folder!=null ) {
+			Entry entry = vuln.getAnalysisInfo().getUnified().getTrace().getPrimary().getDefaultEntry();
+			Node node = entry.getNode();
+			if ( node==null && entry.getNodeRef()!=null) {
+				node = getNodePool().get(entry.getNodeRef().getId());
+			}
+			if ( node!= null && node.getSourceLocation()!=null ) {
+				issue = SQIssue.builder()
+					.engineId("Fortify")
+					.ruleId(vuln.getClassInfo().getClassID())
+					.type("VULNERABILITY")
+					.severity(getSeverity(folder))
+					.primaryLocation(getPrimaryLocation(vuln, node.getSourceLocation())).build();
+			}
 		}
 		return issue;
 	}
 
-	private Location getPrimaryLocation(Vulnerability vuln, SourceLocation sourceLocation) {
+	private String getSeverity(String folder) {
+		if ( "Critical".equalsIgnoreCase(folder) ) {
+			return "CRITICAL";
+		} else if ( "High".equalsIgnoreCase(folder) ) {
+			return "MAJOR";
+		} else if ( "Medium".equalsIgnoreCase(folder) ) {
+			return "MINOR";
+		} else {
+			return "INFO";
+		}
+	}
+
+	private Location getPrimaryLocation(FvdlVulnerability vuln, SourceLocation sourceLocation) {
 		String msg = vuln.getClassInfo().getType();
 		if ( StringUtils.isNotBlank(vuln.getClassInfo().getSubtype()) ) {
 			msg += ": "+vuln.getClassInfo().getSubtype();
@@ -148,23 +152,23 @@ public class Main {
 		}
 		return textRangeBuilder.build();
 	}
-
+	
 	private void writeRules(final JsonGenerator generator) throws IOException, XMLStreamException {
 		generator.writeArrayFieldStart("rules");
 		new StreamingFvdlParser()
 			.handler("Description", reader->{
-				Description desc = XmlMapperHelper.getDefaultXmlMapper().readValue(reader, Description.class);
-				Rule rule = getRule(desc);
+				FvdlDescription desc = XmlMapperHelper.getDefaultXmlMapper().readValue(reader, FvdlDescription.class);
+				SQRule rule = getRule(desc);
 				if ( rule!=null ) {
 					generator.writeObject(rule);
 				}
 			})
-			.parse(fprFileName);
+			.parseFpr(fprFileName);
 		generator.writeEndArray();
 	}
 
-	private Rule getRule(Description desc) {
-		return Rule.builder()
+	private SQRule getRule(FvdlDescription desc) {
+		return SQRule.builder()
 			.engineId("Fortify")
 			.ruleId(desc.getClassID())
 			.name(desc.getClassID())
@@ -172,13 +176,5 @@ public class Main {
 			.description(desc.getExplanation().replace("<Content>", "").replace("</Content>", ""))
 			.severity("BLOCKER")
 			.type("VULNERABILITY").build();
-	}
-
-	public static void main(String[] args) throws IOException, XMLStreamException {
-		if (args.length != 1) {
-			System.err.println("Usage: java -jar FprToSonarQube.jar <file.fpr>");
-			System.exit(1);
-		}
-		new Main(args[0], args[0].replace(".fpr", ".json")).process();
 	}
 }

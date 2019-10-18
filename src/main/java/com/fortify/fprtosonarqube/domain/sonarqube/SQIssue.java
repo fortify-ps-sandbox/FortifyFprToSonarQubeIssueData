@@ -34,7 +34,7 @@ import lombok.Data;
 
 @Builder @Data 
 @JsonInclude(Include.NON_NULL)
-public class Issue implements Serializable {
+public class SQIssue implements Serializable {
 	private static final long serialVersionUID = 1L;
 	private String engineId;
 	private String ruleId;

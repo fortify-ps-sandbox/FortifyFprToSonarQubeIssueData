@@ -22,17 +22,18 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
  * IN THE SOFTWARE.
  ******************************************************************************/
-package com.fortify.fprtosonarqube.domain.sonarqube;
+package com.fortify.fprtosonarqube.domain.report;
 
-import lombok.Builder;
+import java.io.Serializable;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+
 import lombok.Data;
 
-@Builder @Data
-public class Rule {
-	private String engineId;
-	private String ruleId;
-	private String name;
-	private String severity;
-	private String type;
-	private String description;
+@Data
+public class ReportIssue implements Serializable {
+	private static final long serialVersionUID = 1L;
+	@JacksonXmlProperty(isAttribute=true) private String iid;
+	@JsonProperty("Folder") private String folder;
 }

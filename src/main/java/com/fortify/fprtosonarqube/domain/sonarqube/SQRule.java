@@ -22,36 +22,17 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS 
  * IN THE SOFTWARE.
  ******************************************************************************/
-package com.fortify.fprtosonarqube.util;
+package com.fortify.fprtosonarqube.domain.sonarqube;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import lombok.Builder;
+import lombok.Data;
 
-import javax.xml.stream.XMLStreamException;
-
-import com.fortify.util.xml.AbstractStreamingXmlParser;
-
-/**
- * Concrete implementation for {@link AbstractStreamingXmlParser}; this adds
- * the {@link #parse(String)} method for parsing audit.fvdl from an FPR file
- *  
- * @author Ruud Senden
- *
- */
-public class StreamingFvdlParser extends AbstractStreamingXmlParser<StreamingFvdlParser> {
-	public final void parseFpr(String fprFileName) throws IOException, XMLStreamException {
-		try (ZipFile zipFile = new ZipFile(fprFileName)) {
-			parse(zipFile);
-		}
-	}
-
-	private void parse(ZipFile fprFile) throws IOException, XMLStreamException {
-		ZipEntry zipEntry = fprFile.getEntry("audit.fvdl");
-		
-		try (InputStream inputStream = fprFile.getInputStream(zipEntry);) {
-			parse(inputStream);
-		}
-	}
+@Builder @Data
+public class SQRule {
+	private String engineId;
+	private String ruleId;
+	private String name;
+	private String severity;
+	private String type;
+	private String description;
 }
