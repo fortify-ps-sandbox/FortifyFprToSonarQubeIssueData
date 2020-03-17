@@ -1,1 +1,6 @@
 # WORK IN PROGRESS
+
+# Licensing
+
+See [LICENSE.TXT](LICENSE.TXT)
+
